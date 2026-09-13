@@ -1,0 +1,14 @@
+services:
+  checkin:
+    image: ghcr.io/miubu/dingdingcheckin:latest
+    restart: unless-stopped
+    ports:
+      - "0.0.0.0:${PORT:-8888}:8888"
+    environment:
+      DEVICE_TOKEN: ${DEVICE_TOKEN:?Set DEVICE_TOKEN in .env}
+      DEVICE_ID: ${DEVICE_ID:-desk-esp32}
+    volumes:
+      - checkin-data:/data
+
+volumes:
+  checkin-data:
