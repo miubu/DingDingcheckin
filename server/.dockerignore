@@ -1,5 +1,6 @@
 *
 !requirements.txt
 !app.py
+!control.py
 !templates/
 !templates/**

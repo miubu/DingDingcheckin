@@ -2,7 +2,7 @@ FROM python:3.12-slim
 WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt && useradd --uid 10001 --create-home checkin && mkdir /data && chown checkin /data
-COPY app.py .
+COPY app.py control.py ./
 COPY templates ./templates
 ENV PYTHONUNBUFFERED=1 DATABASE=/data/checkin.db
 USER checkin

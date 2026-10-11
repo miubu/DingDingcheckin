@@ -1,51 +1,95 @@
 <!doctype html>
 <html lang="zh-CN">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta http-equiv="refresh" content="10">
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <title>每日打卡 · 设备控制台</title>
   <style>
     *{box-sizing:border-box}body{margin:0;background:#f3f5f7;color:#1d2d35;font:16px/1.6 system-ui,sans-serif}
-    main{max-width:1000px;margin:36px auto;padding:0 20px}h1{font-size:30px;line-height:1.3;margin:0}h2{font-size:19px;margin:0 0 12px}
-    header{display:flex;justify-content:space-between;align-items:center;gap:18px;margin-bottom:24px}.sub{color:#596c76;font-size:14px}
-    .grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}.card{background:white;padding:24px;border:1px solid #dfe6e9;border-radius:16px;margin-bottom:18px}
+    main{max-width:1120px;margin:32px auto;padding:0 20px}h1{font-size:30px;margin:0}h2{font-size:19px;margin:0 0 12px}
+    header,.row{display:flex;flex-wrap:wrap;align-items:center;gap:14px}header{justify-content:space-between;margin-bottom:24px}.sub{color:#596c76;font-size:14px}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}.card{background:white;padding:24px;border:1px solid #dfe6e9;border-radius:16px;margin-bottom:18px;min-width:0}
     .large{font-size:24px;font-weight:700;margin:8px 0}.good{color:#0e7058}.warn{color:#9b4b09}.badge{padding:4px 10px;border-radius:20px;background:#e9f0f1;font-size:14px}
-    button{font:inherit;font-weight:600;border:0;border-radius:9px;background:#176957;color:white;padding:11px 20px;cursor:pointer}
-    button:disabled{background:#e3e8eb;color:#61727a;cursor:not-allowed}
-    table{width:100%;border-collapse:collapse;font-size:14px}th,td{padding:10px 8px;border-bottom:1px solid #edf0f2;text-align:left}th{color:#596c76}
-    .scroll{overflow-x:auto}.notice{font-size:14px;background:#fff7e8;border:1px solid #e9d6b1;border-radius:10px;padding:14px;margin-bottom:22px}
-    button:focus-visible{outline:3px solid #279dcc;outline-offset:3px}
-    @media(max-width:640px){.grid{grid-template-columns:1fr;gap:0}.card{padding:18px}header{align-items:flex-start}h1{font-size:25px}main{margin:24px auto}}
+    button{font:inherit;font-weight:600;border:0;border-radius:9px;background:#176957;color:white;padding:10px 18px;cursor:pointer}.secondary{background:#415b72}
+    button:disabled{background:#e3e8eb;color:#61727a;cursor:not-allowed}button:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px solid #279dcc;outline-offset:2px}
+    input:not([type=hidden]):not([type=checkbox]):not([type=range]),textarea{font:inherit;border:1px solid #b9c8ce;border-radius:7px;padding:7px;max-width:100%}
+    input[type=number]{width:110px}input[type=range]{width:100%;accent-color:#176957}textarea{width:100%;font-family:monospace}label{display:block;margin:10px 0}
+    table{width:100%;border-collapse:collapse;font-size:14px}th,td{padding:9px 6px;border-bottom:1px solid #edf0f2;text-align:left}th{color:#596c76}.scroll{overflow-x:auto}
+    .notice{font-size:14px;background:#fff7e8;border:1px solid #e9d6b1;border-radius:10px;padding:14px;margin-bottom:20px}
+    @media(max-width:720px){.grid{grid-template-columns:1fr;gap:0}.card{padding:18px}h1{font-size:25px}main{margin:24px auto}}
   </style>
 </head>
 <body><main>
-  <header><div><h1>每日打卡</h1><div class="sub">北京时间 UTC+8 · 每 10 秒刷新</div></div></header>
-  <div class="notice">“动作完成”表示舵机控制流程结束。设备没有读取钉钉考勤结果，请在钉钉中核实是否实际打卡成功。</div>
+  <header><div><h1>每日打卡 · 控制台</h1><div class="sub" id="refresh-note">北京时间 UTC+8 · 每 10 秒刷新，编辑时暂停</div></div><button class="secondary" type="button" onclick="location.reload()">刷新状态</button></header>
+  <div class="notice">“动作完成”只表示舵机控制流程结束，不是钉钉考勤确认。网页没有密码，请仅向可信网络开放。调试前确认舵机没有顶住限位。</div>
   <div class="grid">
     <section class="card"><h2>今天 · {{ days[0].date }}</h2><div class="large {{ 'good' if days[0].status == '动作完成' else 'warn' }}">{{ days[0].status }}</div>
-      <p class="sub">{{ days[0].count }} 条执行记录 · {% if info %}每天 {{ info.start|clock }}–{{ info.end|clock }} 自动执行一次{% else %}等待设备上报计划{% endif %}</p>
+      <p class="sub">{{ days[0].count }} 条打卡记录 · 每天 {{ settings.start|clock }}–{{ settings.end|clock }} 自动执行一次{{ '（已暂停）' if not settings.enabled else '' }}</p>
+      <div class="sub">每日重启：{{ settings.reboot_at|clock if settings.reboot_enabled else '关闭' }} · 定位与测试不占用当天自动次数</div>
     </section>
     <section class="card"><h2>设备 <span class="badge">{{ '在线' if online else '离线' if device else '未连接' }}</span></h2>
       {% if device %}<div>{{ device.id }}</div><div class="sub">最近联系 {{ device.last_seen|localtime }} · 信号 {{ info.rssi }} dBm{% if info.temperature is defined %} · 芯片 {{ info.temperature }} °C{% endif %}</div>
-      <div class="sub">{{ '已校时' if info.time_valid else '尚未校时' }} · 待上传 {{ info.pending }} 条 · {{ '存储正常' if info.storage_ok else '存储异常，已停止动作' }}</div>
+      <div class="sub">{{ '已校时' if info.time_valid else '尚未校时' }} · 待上传 {{ info.pending }} / 16 条 · {{ '存储正常' if info.storage_ok else '存储异常，已停止动作' }}</div>
+      <div class="sub">最近占用自动次数的日期：{{ info.last_date if info.last_date else '尚无' }}（动作开始即锁定，调试不会改动）</div>
+      {% if info.pending >= 16 %}<div class="warn">离线记录已满：恢复服务器连接后补传，未清空前停止新动作。</div>{% endif %}
+      {% if info.protocol == 2 %}
+      <div class="sub">运行 {{ info.uptime // 3600 }} 小时 {{ info.uptime // 60 % 60 }} 分 · 可用内存 {{ info.heap // 1024 }} KB · 上次 HTTP {{ info.last_http }}</div>
+      <div class="sub">重启原因：{{ {1:'上电',3:'软件重启',4:'程序异常',5:'中断看门狗',6:'任务看门狗',7:'其他看门狗',8:'深度睡眠',9:'掉压／供电异常',10:'SDIO'}.get(info.reset_reason, '其他') }}（{{ info.reset_reason }}）</div>
+      <div class="{{ 'good' if info.revision == revision else 'warn' }}">配置 v{{ revision }} · {{ '设备已应用' if info.revision == revision else '等待设备同步（当前 v' ~ info.revision ~ '）' }}</div>
+      {% else %}<div class="warn">旧版固件：请重新烧录，才能使用定位、测试、网页配置和重启。</div>{% endif %}
       {% else %}<p class="sub">配置 ESP32 的服务器地址和设备 Token 后，状态会自动出现。</p>{% endif %}
     </section>
   </div>
-  <section class="card"><h2>手动打卡</h2><p class="sub">点击会让设备额外执行一轮完整动作；通常 5 秒内领取指令。指令 2 分钟后过期。手动执行也会占用当天自动次数。</p>
-    <form action="/manual" method="post"><input type="hidden" name="request_id" value="{{ request_id }}">
-      <button type="submit" {% if not ready %}disabled{% endif %}>立即执行一次</button>
-      {% if not ready %}<span class="sub"> 等待设备就绪、待上传记录清空或当前指令完成</span>{% endif %}
+  {% if not ready %}<div class="notice">远程操作暂不可用：请等待设备在线、校时、存储正常、配置同步和现有指令结束。</div>{% endif %}
+  <div class="grid">
+    <section class="card"><h2>打卡动作</h2><p class="sub">完整打卡执行保存的动作序列，并占用当天自动次数。测试执行相同动作，但不计作打卡；仍可能实际按到手机。</p>
+      <div class="row">
+      {% for kind in ['punch','test'] %}<form action="/manual" method="post" onsubmit="return confirm('{{ '将执行完整打卡，并占用当天自动次数，继续？' if kind == 'punch' else '将真实移动舵机测试动作，继续？' }}')">
+        <input type="hidden" name="request_id" value="{{ request_ids[kind] }}"><input type="hidden" name="kind" value="{{ kind }}">
+        <button type="submit" {{ 'class=secondary' if kind == 'test' else '' }} {% if not ready or (kind != 'punch' and info.protocol != 2) %}disabled{% endif %}>{{ '立即打卡' if kind == 'punch' else '测试动作' }}</button>
+      </form>{% endfor %}</div><p class="sub">5 秒轮询 · 指令有效期 2 分钟 · 不会重复领取执行</p>
+    </section>
+    <section class="card"><h2>舵机位置</h2><p class="sub">以 PWM 脉宽控制位置。拖动只选择数值，点击“移动”才生效。到位保持后停止 PWM，不持续用力。</p>
+      <form action="/manual" method="post">
+        <input type="hidden" name="request_id" value="{{ request_ids.position }}"><input type="hidden" name="kind" value="position">
+        <input type="range" id="pulse-range" min="400" max="2500" step="10" value="{{ settings.home }}" aria-label="选择舵机脉宽" oninput="document.getElementById('pulse').value=this.value">
+        <div class="row"><label>脉宽 μs <input type="number" id="pulse" name="pulse" min="400" max="2500" value="{{ settings.home }}" required oninput="document.getElementById('pulse-range').value=this.value"></label>
+        <label>保持 ms <input type="number" name="hold" min="100" max="5000" value="1000" required></label></div>
+        <button type="submit" {% if not ready or info.protocol != 2 %}disabled{% endif %}>移动到该位置</button>
+      </form>
+    </section>
+  </div>
+  <section class="card"><h2>计划和动作配置</h2><p class="sub">保存后约 5–10 秒同步到设备并持久化，断网沿用最后配置。修改时间不会清除当天打卡锁；需要补打时用“立即打卡”。</p>
+    <form action="/settings" method="post">
+      <input type="hidden" name="revision" value="{{ revision }}">
+      <div class="grid"><div>
+        <label><input type="checkbox" name="enabled" {% if settings.enabled %}checked{% endif %}> 每天自动打卡</label>
+        <div class="row"><label>开始时间 <input type="time" name="start" value="{{ settings.start|clock }}" required></label><label>结束时间 <input type="time" name="end" value="{{ settings.end|clock }}" required></label></div>
+        <label><input type="checkbox" name="reboot_enabled" {% if settings.reboot_enabled %}checked{% endif %}> 每日自动重启</label>
+        <label>重启时间 <input type="time" name="reboot_at" value="{{ settings.reboot_at|clock }}" required></label>
+        <p class="sub">避开打卡窗口；开机不足 1 小时不会定时重启。当日错过时间，在运行满 1 小时后补一次，避免循环重启。</p>
+        <div class="row"><label>归位脉宽 μs <input type="number" name="home" value="{{ settings.home }}" min="400" max="2500" required></label><label>重复次数 <input type="number" name="repeats" value="{{ settings.repeats }}" min="1" max="5" required></label></div>
+      </div><div>
+        <label for="steps">动作序列：每行“脉宽 μs,保持 ms”</label>
+        <textarea id="steps" name="steps" rows="9" required spellcheck="false">{% for step in settings.steps %}{{ step[0] }},{{ step[1] }}{{ '\n' if not loop.last else '' }}{% endfor %}</textarea>
+        <p class="sub">1–16 步，脉宽 400–2500，保持 20–5000 ms。每轮后归位 600 ms，最后再归位 500 ms；总长最多 20 秒。默认保留原程序的两轮动作。</p>
+      </div></div><button type="submit">保存配置</button>
     </form>
   </section>
-  <section class="card"><h2>最近指令</h2><div class="scroll"><table><tr><th>提交时间</th><th>状态</th><th>编号</th></tr>
-    {% for c in commands %}<tr><td>{{ c.created|localtime }}</td><td>{{ labels[c.status] }}</td><td>{{ c.id[:8] }}</td></tr>
-    {% else %}<tr><td colspan="3">还没有手动指令</td></tr>{% endfor %}</table></div></section>
-  <div class="grid">
-    <section class="card"><h2>每日记录</h2><table><tr><th>日期</th><th>最近结果</th></tr>
-      {% for d in days %}<tr><td>{{ d.date }}</td><td>{{ d.status }}</td></tr>{% endfor %}</table></section>
-    <section class="card"><h2>最近执行</h2><div class="scroll"><table><tr><th>动作开始</th><th>来源</th><th>结果</th></tr>
-      {% for e in events %}<tr><td>{{ e.at|localtime }}</td><td>{{ '自动' if e.source == 'automatic' else '手动' }}</td><td>{{ labels[e.status] }}</td></tr>
-      {% else %}<tr><td colspan="3">等待设备上报</td></tr>{% endfor %}</table></div></section>
-  </div>
-</main></body></html>
+  <section class="card"><h2>设备维护</h2><div class="row"><form action="/manual" method="post" onsubmit="return confirm('立即重启 ESP32？设备将短暂离线。')">
+    <input type="hidden" name="request_id" value="{{ request_ids.reboot }}"><input type="hidden" name="kind" value="reboot">
+    <button class="secondary" type="submit" {% if not ready or info.protocol != 2 %}disabled{% endif %}>立即重启 ESP32</button>
+    </form><span class="sub">不会清除 Wi-Fi、动作配置、每日锁或待上传记录。</span></div></section>
+  <section class="card"><h2>最近指令</h2><div class="scroll"><table><tr><th>提交时间</th><th>类型</th><th>状态</th><th>编号</th></tr>
+    {% for c in commands %}<tr><td>{{ c.created|localtime }}</td><td>{{ kinds[c.kind] }}</td><td>{{ labels[c.status] }}</td><td>{{ c.id[:8] }}</td></tr>
+    {% else %}<tr><td colspan="4">还没有手动指令</td></tr>{% endfor %}</table></div></section>
+  <div class="grid"><section class="card"><h2>每日打卡记录</h2><table><tr><th>日期</th><th>最近结果</th></tr>
+    {% for d in days %}<tr><td>{{ d.date }}</td><td>{{ d.status }}</td></tr>{% endfor %}</table></section>
+    <section class="card"><h2>最近执行（含调试）</h2><div class="scroll"><table><tr><th>开始</th><th>来源／类型</th><th>结果</th></tr>
+      {% for e in events %}<tr><td>{{ e.at|localtime }}</td><td>{{ '自动' if e.source == 'automatic' else '手动' }} · {{ kinds[e.kind] }}</td><td>{{ labels[e.status] }}</td></tr>
+      {% else %}<tr><td colspan="3">等待设备上报</td></tr>{% endfor %}</table></div></section></div>
+</main><script>
+  let edited = false;
+  document.addEventListener('input', () => { edited = true; document.getElementById('refresh-note').textContent = '编辑中：自动刷新已暂停，提交或手动刷新后恢复'; });
+  document.addEventListener('change', () => { edited = true; });
+  setInterval(() => { if (!edited && !['INPUT','TEXTAREA','BUTTON'].includes(document.activeElement.tagName)) location.reload(); }, 10000);
+</script></body></html>
